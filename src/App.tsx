@@ -7,6 +7,21 @@ import {
   INITIAL_CUSTOMERS, 
   INITIAL_PAYMENTS 
 } from './data/initialData';
+import { 
+  db,
+  IDOLS_COLLECTION,
+  ORDERS_COLLECTION,
+  CUSTOMERS_COLLECTION,
+  PAYMENTS_COLLECTION,
+  seedInitialDataIfEmpty,
+  dbAddOrUpdateIdol,
+  dbDeleteIdol,
+  dbSaveOrder,
+  dbUpdateOrderStatus,
+  dbSaveCustomer,
+  dbSavePayment
+} from './firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -123,6 +138,72 @@ export default function App() {
     }
   }, [currentPage]);
 
+  // Real-time Firestore sync & auto-seed initial data
+  useEffect(() => {
+    // 1. Seed initial data to Firestore if collections are empty
+    seedInitialDataIfEmpty();
+
+    // 2. Real-time listener for Idols
+    const unsubIdols = onSnapshot(collection(db, IDOLS_COLLECTION), (snapshot) => {
+      if (!snapshot.empty) {
+        const remoteIdols: Idol[] = [];
+        snapshot.forEach((docSnap) => {
+          remoteIdols.push(docSnap.data() as Idol);
+        });
+        setIdols(remoteIdols);
+      }
+    }, (error) => {
+      console.warn('Firestore idols listener notice:', error);
+    });
+
+    // 3. Real-time listener for Orders
+    const unsubOrders = onSnapshot(collection(db, ORDERS_COLLECTION), (snapshot) => {
+      if (!snapshot.empty) {
+        const remoteOrders: CustomerOrder[] = [];
+        snapshot.forEach((docSnap) => {
+          remoteOrders.push(docSnap.data() as CustomerOrder);
+        });
+        remoteOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setOrders(remoteOrders);
+      }
+    }, (error) => {
+      console.warn('Firestore orders listener notice:', error);
+    });
+
+    // 4. Real-time listener for Customers
+    const unsubCustomers = onSnapshot(collection(db, CUSTOMERS_COLLECTION), (snapshot) => {
+      if (!snapshot.empty) {
+        const remoteCust: CustomerUser[] = [];
+        snapshot.forEach((docSnap) => {
+          remoteCust.push(docSnap.data() as CustomerUser);
+        });
+        setCustomers(remoteCust);
+      }
+    }, (error) => {
+      console.warn('Firestore customers listener notice:', error);
+    });
+
+    // 5. Real-time listener for Payments
+    const unsubPayments = onSnapshot(collection(db, PAYMENTS_COLLECTION), (snapshot) => {
+      if (!snapshot.empty) {
+        const remotePay: PaymentRecord[] = [];
+        snapshot.forEach((docSnap) => {
+          remotePay.push(docSnap.data() as PaymentRecord);
+        });
+        setPayments(remotePay);
+      }
+    }, (error) => {
+      console.warn('Firestore payments listener notice:', error);
+    });
+
+    return () => {
+      unsubIdols();
+      unsubOrders();
+      unsubCustomers();
+      unsubPayments();
+    };
+  }, []);
+
   // Sync to local storage
   useEffect(() => {
     localStorage.setItem('ecoganesh_idols', JSON.stringify(idols));
@@ -228,6 +309,7 @@ export default function App() {
   const handlePlaceOrder = (newOrder: CustomerOrder) => {
     setOrders((prev) => [newOrder, ...prev]);
     handleClearCart();
+    dbSaveOrder(newOrder); // Persist Order to Firestore
 
     // Record payment
     const newPayment: PaymentRecord = {
@@ -240,70 +322,81 @@ export default function App() {
       date: newOrder.createdAt
     };
     setPayments((prev) => [newPayment, ...prev]);
+    dbSavePayment(newPayment); // Persist Payment to Firestore
 
     // Update or add customer record
-    setCustomers((prev) => {
-      const existingIndex = prev.findIndex(c => c.name.toLowerCase() === newOrder.customerName.toLowerCase());
-      if (existingIndex >= 0) {
+    const existingIndex = customers.findIndex(c => c.name.toLowerCase() === newOrder.customerName.toLowerCase());
+    let customerToPersist: CustomerUser;
+    if (existingIndex >= 0) {
+      const existing = customers[existingIndex];
+      customerToPersist = {
+        ...existing,
+        ordersCount: existing.ordersCount + 1,
+        totalSpent: existing.totalSpent + newOrder.total
+      };
+      setCustomers((prev) => {
         const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          ordersCount: updated[existingIndex].ordersCount + 1,
-          totalSpent: updated[existingIndex].totalSpent + newOrder.total
-        };
+        updated[existingIndex] = customerToPersist;
         return updated;
-      } else {
-        const newCust: CustomerUser = {
-          id: `cust-${Date.now()}`,
-          name: newOrder.customerName,
-          email: `${newOrder.customerName.toLowerCase().replace(/\s+/g, '.')}@example.com`,
-          phone: newOrder.customerPhone,
-          city: newOrder.city,
-          joinedDate: new Date().toISOString().split('T')[0],
-          ordersCount: 1,
-          totalSpent: newOrder.total
-        };
-        return [newCust, ...prev];
-      }
-    });
+      });
+    } else {
+      customerToPersist = {
+        id: `cust-${Date.now()}`,
+        name: newOrder.customerName,
+        email: `${newOrder.customerName.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        phone: newOrder.customerPhone,
+        city: newOrder.city,
+        joinedDate: new Date().toISOString().split('T')[0],
+        ordersCount: 1,
+        totalSpent: newOrder.total
+      };
+      setCustomers((prev) => [customerToPersist, ...prev]);
+    }
+    dbSaveCustomer(customerToPersist); // Persist Customer to Firestore
 
     // Reduce stock
     setIdols((prev) =>
       prev.map((idol) => {
         const orderedItem = newOrder.items.find((it) => it.idolId === idol.id);
         if (orderedItem) {
-          return { ...idol, stock: Math.max(0, idol.stock - orderedItem.quantity) };
+          const updated = { ...idol, stock: Math.max(0, idol.stock - orderedItem.quantity) };
+          dbAddOrUpdateIdol(updated); // Update stock in Firestore
+          return updated;
         }
         return idol;
       })
     );
 
-    showToast(`Order ${newOrder.orderNumber} placed successfully!`);
+    showToast(`Order ${newOrder.orderNumber} placed successfully & saved to database!`);
   };
 
   // Admin operations
   const handleAddIdol = (newIdol: Idol) => {
     setIdols((prev) => [newIdol, ...prev]);
-    showToast(`Added new idol "${newIdol.name}" to the store.`);
+    dbAddOrUpdateIdol(newIdol); // Add to Firestore
+    showToast(`Added new idol "${newIdol.name}" to the store & database.`);
   };
 
   const handleUpdateIdol = (updatedIdol: Idol) => {
     setIdols((prev) =>
       prev.map((i) => (i.id === updatedIdol.id ? updatedIdol : i))
     );
-    showToast(`Updated details for "${updatedIdol.name}".`);
+    dbAddOrUpdateIdol(updatedIdol); // Update in Firestore
+    showToast(`Updated details for "${updatedIdol.name}" in database.`);
   };
 
   const handleDeleteIdol = (idolId: string) => {
     setIdols((prev) => prev.filter((i) => i.id !== idolId));
-    showToast('Idol removed from catalog.');
+    dbDeleteIdol(idolId); // Delete from Firestore
+    showToast('Idol removed from catalog & database.');
   };
 
   const handleUpdateOrderStatus = (orderId: string, newStatus: CustomerOrder['orderStatus']) => {
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, orderStatus: newStatus } : o))
     );
-    showToast(`Order status updated to ${newStatus}.`);
+    dbUpdateOrderStatus(orderId, newStatus); // Update status in Firestore
+    showToast(`Order status updated to ${newStatus} in database.`);
   };
 
   // Auth
