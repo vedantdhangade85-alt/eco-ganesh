@@ -1,4 +1,4 @@
-// Firebase Configuration & Firestore setup
+// Firebase Configuration, Firestore & Authentication setup
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -8,10 +8,19 @@ import {
   setDoc, 
   updateDoc, 
   deleteDoc, 
-  onSnapshot,
-  query,
-  orderBy
+  onSnapshot
 } from 'firebase/firestore';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
+  User as FirebaseUser
+} from 'firebase/auth';
 import { Idol, CustomerOrder, CustomerUser, PaymentRecord } from './types';
 import { INITIAL_IDOLS, INITIAL_ORDERS, INITIAL_CUSTOMERS, INITIAL_PAYMENTS } from './data/initialData';
 
@@ -25,9 +34,15 @@ const firebaseConfig = {
   measurementId: "G-92PSPHGW0D"
 };
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firestore Database
 export const db = getFirestore(app);
+
+// Initialize Firebase Authentication
+export const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 // Collection References
 export const IDOLS_COLLECTION = 'idols';
@@ -74,7 +89,69 @@ export async function seedInitialDataIfEmpty() {
   }
 }
 
-// Database Actions
+// ---------------- Authentication Methods ----------------
+
+export async function firebaseRegisterUser(name: string, email: string, pass: string, phone?: string, city?: string) {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+  if (name && auth.currentUser) {
+    await updateProfile(auth.currentUser, { displayName: name });
+  }
+
+  // Also save devotee profile to Firestore customers collection
+  try {
+    const newCust: CustomerUser = {
+      id: userCredential.user.uid,
+      name: name || email.split('@')[0],
+      email: email,
+      phone: phone || '+91 98000 00000',
+      city: city || 'Maharashtra',
+      joinedDate: new Date().toISOString().split('T')[0],
+      ordersCount: 0,
+      totalSpent: 0
+    };
+    await dbSaveCustomer(newCust);
+  } catch (e) {
+    console.warn('Could not save customer profile to Firestore:', e);
+  }
+
+  return userCredential.user;
+}
+
+export async function firebaseLoginUser(email: string, pass: string) {
+  const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+  return userCredential.user;
+}
+
+export async function firebaseGoogleSignIn() {
+  const userCredential = await signInWithPopup(auth, googleProvider);
+  const u = userCredential.user;
+  
+  // Also register or update customer record in Firestore
+  try {
+    const newCust: CustomerUser = {
+      id: u.uid,
+      name: u.displayName || u.email?.split('@')[0] || 'Devotee',
+      email: u.email || '',
+      phone: u.phoneNumber || '+91 98000 00000',
+      city: 'India',
+      joinedDate: new Date().toISOString().split('T')[0],
+      ordersCount: 0,
+      totalSpent: 0
+    };
+    await dbSaveCustomer(newCust);
+  } catch (e) {
+    console.warn('Could not save Google customer profile to Firestore:', e);
+  }
+
+  return u;
+}
+
+export async function firebaseSignOut() {
+  await signOut(auth);
+}
+
+// ---------------- Database Actions ----------------
+
 export async function dbAddOrUpdateIdol(idol: Idol) {
   try {
     await setDoc(doc(db, IDOLS_COLLECTION, idol.id), idol);

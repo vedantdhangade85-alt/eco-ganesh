@@ -9,6 +9,8 @@ import {
 } from './data/initialData';
 import { 
   db,
+  auth,
+  firebaseSignOut,
   IDOLS_COLLECTION,
   ORDERS_COLLECTION,
   CUSTOMERS_COLLECTION,
@@ -22,6 +24,7 @@ import {
   dbSavePayment
 } from './firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -196,11 +199,23 @@ export default function App() {
       console.warn('Firestore payments listener notice:', error);
     });
 
+    // 6. Real-time Firebase Authentication listener
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setCurrentUser({
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Devotee',
+          email: firebaseUser.email || '',
+          role: 'customer'
+        });
+      }
+    });
+
     return () => {
       unsubIdols();
       unsubOrders();
       unsubCustomers();
       unsubPayments();
+      unsubAuth();
     };
   }, []);
 
@@ -405,8 +420,14 @@ export default function App() {
     showToast(`Signed in as ${user.name}`);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await firebaseSignOut();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
     setCurrentUser(null);
+    localStorage.removeItem('ecoganesh_user');
     showToast('Logged out successfully');
   };
 
