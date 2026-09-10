@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-natural-bg: #FDFBF7;
+  --color-natural-surface: #F5F1E8;
+  --color-natural-stone: #E5E1D8;
+  --color-natural-olive: #5D6D31;
+  --color-natural-olive-hover: #4F5E29;
+  --color-natural-forest: #2D3518;
+  --color-natural-terracotta: #C16A3D;
+  --color-natural-terracotta-hover: #AC5C32;
+  --color-natural-sage: #E9EDC9;
+  --color-natural-muted: #6B705C;
+  --color-natural-light-sage: #A9AF8E;
+  --color-natural-text: #3D3D3D;
+  --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+body {
+  background-color: #FDFBF7;
+  color: #3D3D3D;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+h1, h2, h3, .font-natural-serif {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+}

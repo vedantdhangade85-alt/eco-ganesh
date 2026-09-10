@@ -1,0 +1,6 @@
+{
+  "name": "Eco Ganesh",
+  "description": "Eco-friendly Ganpati idol online store featuring Shadu clay idols, tree Ganpati, product details, cart, checkout, customer portal, and admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
