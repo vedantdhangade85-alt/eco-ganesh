@@ -25,9 +25,19 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface PaymentHistoryItem {
+  id: string;
+  amount: number;
+  date: string;
+  paymentMethod: string;
+  note: string; // e.g. "Advance Booking Deposit", "Pending Balance Settlement"
+  transactionId?: string;
+}
+
 export interface CustomerOrder {
   id: string;
   orderNumber: string;
+  billNumber?: string;
   createdAt: string;
   customerName: string;
   customerPhone: string;
@@ -36,7 +46,7 @@ export interface CustomerOrder {
   city: string;
   pincode: string;
   paymentMethod: 'UPI' | 'Cash on Delivery' | 'Net Banking' | 'Credit/Debit Card';
-  paymentStatus: 'Paid' | 'Pending' | 'Cash on Delivery';
+  paymentStatus: 'Paid' | 'Pending' | 'Cash on Delivery' | 'Partially Paid' | 'Fully Paid';
   orderStatus: 'Pending' | 'Confirmed' | 'Dispatched' | 'Delivered';
   items: {
     idolId: string;
@@ -49,6 +59,9 @@ export interface CustomerOrder {
   subtotal: number;
   shipping: number;
   total: number;
+  advancePayment: number;
+  pendingPayment: number;
+  paymentHistory?: PaymentHistoryItem[];
 }
 
 export interface CustomerUser {
@@ -91,7 +104,9 @@ export type PageView =
   | 'categories'
   | 'cart'
   | 'checkout'
+  | 'billing'
   | 'contact'
   | 'login'
   | 'register'
   | 'admin';
+

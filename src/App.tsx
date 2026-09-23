@@ -20,6 +20,7 @@ import {
   dbDeleteIdol,
   dbSaveOrder,
   dbUpdateOrderStatus,
+  dbUpdateOrderPayment,
   dbSaveCustomer,
   dbSavePayment
 } from './firebase';
@@ -35,6 +36,8 @@ import { CategoriesView } from './components/CategoriesView';
 import { AboutUsView } from './components/AboutUsView';
 import { CartView } from './components/CartView';
 import { CheckoutView } from './components/CheckoutView';
+import { BillingView } from './components/BillingView';
+import { BillInvoiceModal } from './components/BillInvoiceModal';
 import { ContactView } from './components/ContactView';
 import { AuthView } from './components/AuthView';
 import { AdminPanelView } from './components/AdminPanelView';
@@ -91,6 +94,10 @@ export default function App() {
 
   // Product Details Modal state
   const [selectedIdolForModal, setSelectedIdolForModal] = useState<Idol | null>(null);
+
+  // Bill / Invoice Modal state
+  const [selectedOrderForBill, setSelectedOrderForBill] = useState<CustomerOrder | null>(null);
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
 
   // PHP/XAMPP Code Modal state
   const [isPhpModalOpen, setIsPhpModalOpen] = useState(false);
@@ -326,14 +333,15 @@ export default function App() {
     handleClearCart();
     dbSaveOrder(newOrder); // Persist Order to Firestore
 
-    // Record payment
+    // Record payment if advance > 0
+    const advPaid = newOrder.advancePayment ?? (newOrder.paymentStatus === 'Paid' || newOrder.paymentStatus === 'Fully Paid' ? newOrder.total : 0);
     const newPayment: PaymentRecord = {
       transactionId: `TXN-${Date.now().toString().slice(-6)}`,
       orderNumber: newOrder.orderNumber,
       customerName: newOrder.customerName,
       paymentMethod: newOrder.paymentMethod,
-      amount: newOrder.total,
-      status: newOrder.paymentMethod === 'Cash on Delivery' ? 'Pending' : 'Completed',
+      amount: advPaid > 0 ? advPaid : newOrder.total,
+      status: advPaid > 0 ? 'Completed' : 'Pending',
       date: newOrder.createdAt
     };
     setPayments((prev) => [newPayment, ...prev]);
@@ -382,7 +390,74 @@ export default function App() {
       })
     );
 
-    showToast(`Order ${newOrder.orderNumber} placed successfully & saved to database!`);
+    showToast(`Order ${newOrder.orderNumber} placed & Bill ${newOrder.billNumber || ''} generated!`);
+  };
+
+  // Open Bill Modal
+  const handleOpenBillModal = (order: CustomerOrder) => {
+    setSelectedOrderForBill(order);
+    setIsBillModalOpen(true);
+  };
+
+  // Pay Pending Amount on a Bill
+  const handlePayPendingAmount = (orderId: string, paymentMethod: string) => {
+    const orderToUpdate = orders.find(o => o.id === orderId);
+    if (!orderToUpdate) return;
+
+    const adv = orderToUpdate.advancePayment ?? (orderToUpdate.paymentStatus === 'Paid' || orderToUpdate.paymentStatus === 'Fully Paid' ? orderToUpdate.total : 0);
+    const pendingToClear = Math.max(0, orderToUpdate.pendingPayment ?? (orderToUpdate.total - adv));
+    const newTotalAdvance = orderToUpdate.total;
+    const newPending = 0;
+    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    const txnId = `TXN-PEND-${Date.now().toString().slice(-6)}`;
+
+    const newPaymentHistoryItem = {
+      id: `pay-${Date.now()}`,
+      amount: pendingToClear,
+      date: timestamp,
+      paymentMethod,
+      note: 'Pending Balance Clearance Settlement',
+      transactionId: txnId
+    };
+
+    const updatedHistory = [...(orderToUpdate.paymentHistory || []), newPaymentHistoryItem];
+
+    const updatedOrder: CustomerOrder = {
+      ...orderToUpdate,
+      advancePayment: newTotalAdvance,
+      pendingPayment: newPending,
+      paymentStatus: 'Fully Paid',
+      paymentHistory: updatedHistory
+    };
+
+    // Update local state
+    setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+    if (selectedOrderForBill?.id === orderId) {
+      setSelectedOrderForBill(updatedOrder);
+    }
+
+    // Persist to Firestore
+    dbUpdateOrderPayment(orderId, {
+      advancePayment: newTotalAdvance,
+      pendingPayment: newPending,
+      paymentStatus: 'Fully Paid',
+      paymentHistory: updatedHistory
+    });
+
+    // Record new payment transaction in payments registry
+    const newPaymentRecord: PaymentRecord = {
+      transactionId: txnId,
+      orderNumber: orderToUpdate.orderNumber,
+      customerName: orderToUpdate.customerName,
+      paymentMethod: paymentMethod,
+      amount: pendingToClear,
+      status: 'Completed',
+      date: timestamp
+    };
+    setPayments(prev => [newPaymentRecord, ...prev]);
+    dbSavePayment(newPaymentRecord);
+
+    showToast(`Bill for Order ${orderToUpdate.orderNumber} is now FULLY PAID! Received ₹${pendingToClear.toLocaleString('en-IN')}`);
   };
 
   // Admin operations
@@ -498,6 +573,15 @@ export default function App() {
             cart={cart}
             onPlaceOrder={handlePlaceOrder}
             setCurrentPage={setCurrentPage}
+            onOpenBillModal={handleOpenBillModal}
+          />
+        )}
+
+        {currentPage === 'billing' && (
+          <BillingView
+            orders={orders}
+            onOpenBillModal={handleOpenBillModal}
+            setCurrentPage={setCurrentPage}
           />
         )}
 
@@ -522,6 +606,8 @@ export default function App() {
             onDeleteIdol={handleDeleteIdol}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             openPhpModal={() => setIsPhpModalOpen(true)}
+            onOpenBillModal={handleOpenBillModal}
+            onPayPending={handlePayPendingAmount}
           />
         )}
       </main>
@@ -540,6 +626,14 @@ export default function App() {
       <PhpXamppModal
         isOpen={isPhpModalOpen}
         onClose={() => setIsPhpModalOpen(false)}
+      />
+
+      {/* Official Tax Invoice & Bill Modal */}
+      <BillInvoiceModal
+        order={selectedOrderForBill}
+        isOpen={isBillModalOpen}
+        onClose={() => setIsBillModalOpen(false)}
+        onPayPending={handlePayPendingAmount}
       />
 
       {/* Global Toast Notification */}

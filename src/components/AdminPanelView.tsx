@@ -31,6 +31,8 @@ interface AdminPanelViewProps {
   onDeleteIdol: (idolId: string) => void;
   onUpdateOrderStatus: (orderId: string, newStatus: CustomerOrder['orderStatus']) => void;
   openPhpModal: () => void;
+  onOpenBillModal?: (order: CustomerOrder) => void;
+  onPayPending?: (orderId: string, paymentMethod: string) => void;
 }
 
 export const AdminPanelView: React.FC<AdminPanelViewProps> = ({
@@ -43,6 +45,8 @@ export const AdminPanelView: React.FC<AdminPanelViewProps> = ({
   onDeleteIdol,
   onUpdateOrderStatus,
   openPhpModal,
+  onOpenBillModal,
+  onPayPending,
 }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'idols' | 'orders' | 'customers' | 'payments'>('dashboard');
 
@@ -66,8 +70,16 @@ export const AdminPanelView: React.FC<AdminPanelViewProps> = ({
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Calculations for dashboard
-  const totalSales = orders.reduce((acc, o) => acc + (o.paymentStatus === 'Paid' ? o.total : 0), 0);
+  // Calculations for dashboard & billing
+  const totalSales = orders.reduce((acc, o) => acc + o.total, 0);
+  const totalAdvanceCollected = orders.reduce((acc, o) => {
+    const adv = o.advancePayment ?? (o.paymentStatus === 'Paid' || o.paymentStatus === 'Fully Paid' ? o.total : 0);
+    return acc + adv;
+  }, 0);
+  const totalPendingReceivables = orders.reduce((acc, o) => {
+    const adv = o.advancePayment ?? (o.paymentStatus === 'Paid' || o.paymentStatus === 'Fully Paid' ? o.total : 0);
+    return acc + Math.max(0, o.pendingPayment ?? (o.total - adv));
+  }, 0);
   const totalOrdersCount = orders.length;
   const totalStockCount = idols.reduce((acc, i) => acc + i.stock, 0);
   const totalCustomersCount = customers.length;
@@ -240,68 +252,84 @@ export const AdminPanelView: React.FC<AdminPanelViewProps> = ({
       )}
 
       {/* 1. DASHBOARD METRICS CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {/* Total Sales */}
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-1">
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Total Sales</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Total Sales</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <TrendingUp className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-amber-950 font-serif">
+          <p className="text-xl sm:text-2xl font-extrabold text-amber-950 font-serif">
             ₹{totalSales.toLocaleString('en-IN')}
           </p>
-          <span className="text-[11px] text-emerald-700 font-semibold block">
-            Across {orders.length} puja orders
+          <span className="text-[10px] text-emerald-700 font-semibold block">
+            {orders.length} puja bookings
+          </span>
+        </div>
+
+        {/* Advance Collected */}
+        <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-xs space-y-1 bg-gradient-to-br from-white to-emerald-50/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Advance Paid</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-extrabold text-emerald-900 font-serif">
+            ₹{totalAdvanceCollected.toLocaleString('en-IN')}
+          </p>
+          <span className="text-[10px] text-emerald-700 font-semibold block">
+            Confirmed token deposits
+          </span>
+        </div>
+
+        {/* Pending Receivables */}
+        <div className="bg-white p-4 rounded-2xl border border-amber-300 shadow-xs space-y-1 bg-gradient-to-br from-white to-amber-50/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-[#C16A3D] uppercase tracking-wider">Pending Dues</span>
+            <div className="w-7 h-7 rounded-lg bg-amber-100 text-[#C16A3D] flex items-center justify-center">
+              <Clock className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-extrabold text-[#C16A3D] font-serif">
+            ₹{totalPendingReceivables.toLocaleString('en-IN')}
+          </p>
+          <span className="text-[10px] text-amber-800 font-semibold block">
+            Due prior to dispatch
           </span>
         </div>
 
         {/* Total Orders */}
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-1">
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Total Orders</span>
-            <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-700 flex items-center justify-center">
-              <ShoppingBag className="w-4 h-4" />
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Orders</span>
+            <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-700 flex items-center justify-center">
+              <ShoppingBag className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-amber-950 font-serif">
+          <p className="text-xl sm:text-2xl font-extrabold text-amber-950 font-serif">
             {totalOrdersCount}
           </p>
-          <span className="text-[11px] text-stone-500 block">
+          <span className="text-[10px] text-stone-500 block">
             {orders.filter(o => o.orderStatus === 'Pending').length} pending dispatch
           </span>
         </div>
 
         {/* Idols in Stock */}
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-1">
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-1 col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Idols in Stock</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-              <Package className="w-4 h-4" />
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Catalog Stock</span>
+            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+              <Package className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-amber-950 font-serif">
+          <p className="text-xl sm:text-2xl font-extrabold text-amber-950 font-serif">
             {totalStockCount} Units
           </p>
-          <span className="text-[11px] text-stone-500 block">
-            {idols.length} active idol models
-          </span>
-        </div>
-
-        {/* Active Customers */}
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Devotees</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-amber-950 font-serif">
-            {totalCustomersCount}
-          </p>
-          <span className="text-[11px] text-stone-500 block">
-            Registered accounts
+          <span className="text-[10px] text-stone-500 block">
+            {idols.length} idol models
           </span>
         </div>
       </div>
@@ -603,75 +631,135 @@ export const AdminPanelView: React.FC<AdminPanelViewProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold">
-                    <th className="p-3.5">Order #</th>
+                    <th className="p-3.5">Order & Bill #</th>
                     <th className="p-3.5">Date</th>
-                    <th className="p-3.5">Customer</th>
-                    <th className="p-3.5">Delivery Address</th>
-                    <th className="p-3.5">Idols</th>
-                    <th className="p-3.5">Total & Payment</th>
-                    <th className="p-3.5">Status Update</th>
+                    <th className="p-3.5">Customer & Delivery</th>
+                    <th className="p-3.5">Idols Ordered</th>
+                    <th className="p-3.5">Billing Breakdown</th>
+                    <th className="p-3.5">Payment Status</th>
+                    <th className="p-3.5">Order Status</th>
+                    <th className="p-3.5 text-right">Invoice & Settlement</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-200">
-                  {filteredOrders.map((order, idx) => (
-                    <tr 
-                      key={order.id} 
-                      className={`transition-colors ${
-                        idx === 0 
-                          ? 'bg-amber-50/70 hover:bg-amber-100/70 border-l-4 border-l-orange-600' 
-                          : 'hover:bg-stone-50/80'
-                      }`}
-                    >
-                      <td className="p-3.5 font-mono font-bold text-amber-950">
-                        <div className="flex items-center gap-2">
-                          <span>{order.orderNumber}</span>
-                          {idx === 0 && (
-                            <span className="px-2 py-0.5 bg-orange-600 text-white text-[9px] font-extrabold rounded-full uppercase tracking-wider animate-pulse">
-                              New
+                  {filteredOrders.map((order, idx) => {
+                    const billNo = order.billNumber || `BILL-2026-${order.orderNumber.replace(/[^0-9]/g, '').slice(-4) || '1001'}`;
+                    const adv = order.advancePayment ?? (order.paymentStatus === 'Paid' || order.paymentStatus === 'Fully Paid' ? order.total : 0);
+                    const pend = Math.max(0, order.pendingPayment ?? (order.total - adv));
+                    const isFullyPaid = pend === 0 || order.paymentStatus === 'Fully Paid' || order.paymentStatus === 'Paid';
+
+                    return (
+                      <tr 
+                        key={order.id} 
+                        className={`transition-colors ${
+                          idx === 0 
+                            ? 'bg-amber-50/70 hover:bg-amber-100/70 border-l-4 border-l-orange-600' 
+                            : 'hover:bg-stone-50/80'
+                        }`}
+                      >
+                        <td className="p-3.5 font-mono">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-amber-950">{order.orderNumber}</span>
+                            {idx === 0 && (
+                              <span className="px-1.5 py-0.2 bg-orange-600 text-white text-[9px] font-extrabold rounded uppercase">
+                                New
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-stone-400 font-mono block">
+                            {billNo}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-stone-500 whitespace-nowrap">
+                          {order.createdAt}
+                        </td>
+                        <td className="p-3.5">
+                          <span className="font-bold text-stone-900 block">{order.customerName}</span>
+                          <span className="text-[10px] text-stone-500">{order.customerPhone}</span>
+                          <span className="text-[10px] text-stone-400 block truncate max-w-[150px]">{order.city}</span>
+                        </td>
+                        <td className="p-3.5">
+                          {order.items.map((it, i) => (
+                            <div key={i} className="text-[11px] text-stone-700 truncate max-w-[160px]">
+                              {it.idolName} ({it.size}) x{it.quantity}
+                            </div>
+                          ))}
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          <div className="font-mono font-bold text-stone-900">
+                            Total: ₹{order.total.toLocaleString('en-IN')}
+                          </div>
+                          <div className="text-[10px] text-emerald-700 font-medium">
+                            Adv: ₹{adv.toLocaleString('en-IN')}
+                          </div>
+                          <div className={`text-[10px] font-bold ${pend > 0 ? 'text-[#C16A3D]' : 'text-stone-400'}`}>
+                            Pending: ₹{pend.toLocaleString('en-IN')}
+                          </div>
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          {isFullyPaid ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Fully Paid
+                            </span>
+                          ) : adv > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-bold rounded-full">
+                              <Clock className="w-3 h-3 text-amber-600" /> Partially Paid
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-900 text-[10px] font-bold rounded-full">
+                              <Clock className="w-3 h-3 text-orange-600" /> Unpaid / COD
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-stone-500 whitespace-nowrap">
-                        {order.createdAt}
-                      </td>
-                      <td className="p-3.5">
-                        <span className="font-bold text-stone-900 block">{order.customerName}</span>
-                        <span className="text-[10px] text-stone-500">{order.customerPhone}</span>
-                      </td>
-                      <td className="p-3.5 text-stone-700 max-w-[200px]">
-                        <p className="truncate">{order.address}</p>
-                        <p className="text-[10px] text-stone-400">{order.city} - {order.pincode}</p>
-                      </td>
-                      <td className="p-3.5">
-                        {order.items.map((it, idx) => (
-                          <div key={idx} className="text-[11px] text-stone-700">
-                            {it.idolName} ({it.size}) x {it.quantity}
+                          <span className="block text-[10px] text-stone-400 mt-0.5">
+                            {order.paymentMethod}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          <select
+                            value={order.orderStatus}
+                            onChange={(e) => onUpdateOrderStatus(order.id, e.target.value as any)}
+                            className="bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-bold text-stone-800"
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="Confirmed">Confirmed</option>
+                            <option value="Dispatched">Dispatched</option>
+                            <option value="Delivered">Delivered</option>
+                          </select>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {onOpenBillModal && (
+                              <button
+                                onClick={() => onOpenBillModal(order)}
+                                id={`admin-view-bill-${order.id}`}
+                                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                                title="View & Print Bill"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-orange-700" />
+                                <span>Bill</span>
+                              </button>
+                            )}
+
+                            {pend > 0 && onPayPending && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Mark ₹${pend.toLocaleString('en-IN')} pending balance as paid for Order ${order.orderNumber}?`)) {
+                                    onPayPending(order.id, 'Cash / Workshop Settlement');
+                                  }
+                                }}
+                                id={`admin-settle-pending-${order.id}`}
+                                className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-[11px] transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                title="Settle remaining balance"
+                              >
+                                <CreditCard className="w-3 h-3" />
+                                <span>Settle ₹{pend}</span>
+                              </button>
+                            )}
                           </div>
-                        ))}
-                      </td>
-                      <td className="p-3.5">
-                        <span className="font-bold text-stone-900 block">
-                          ₹{order.total.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-[10px] text-emerald-700 font-medium">
-                          {order.paymentMethod} • {order.paymentStatus}
-                        </span>
-                      </td>
-                      <td className="p-3.5">
-                        <select
-                          value={order.orderStatus}
-                          onChange={(e) => onUpdateOrderStatus(order.id, e.target.value as any)}
-                          className="bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-bold text-stone-800"
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Confirmed">Confirmed</option>
-                          <option value="Dispatched">Dispatched</option>
-                          <option value="Delivered">Delivered</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

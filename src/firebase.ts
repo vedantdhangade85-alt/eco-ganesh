@@ -184,6 +184,14 @@ export async function dbUpdateOrderStatus(orderId: string, status: CustomerOrder
   }
 }
 
+export async function dbUpdateOrderPayment(orderId: string, updatedOrder: Partial<CustomerOrder>) {
+  try {
+    await updateDoc(doc(db, ORDERS_COLLECTION, orderId), updatedOrder);
+  } catch (err) {
+    console.error('Error updating order payment in Firestore:', err);
+  }
+}
+
 export async function dbSaveCustomer(customer: CustomerUser) {
   try {
     await setDoc(doc(db, CUSTOMERS_COLLECTION, customer.id), customer);

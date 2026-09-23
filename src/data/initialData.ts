@@ -287,6 +287,7 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
   {
     id: 'ord-101',
     orderNumber: 'EG-2026-8921',
+    billNumber: 'BILL-2026-8921',
     createdAt: '2026-08-25 14:30',
     customerName: 'Rajesh Sharma',
     customerPhone: '+91 98201 23456',
@@ -295,7 +296,7 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
     city: 'Mumbai',
     pincode: '400001',
     paymentMethod: 'UPI',
-    paymentStatus: 'Paid',
+    paymentStatus: 'Fully Paid',
     orderStatus: 'Confirmed',
     items: [
       {
@@ -309,11 +310,24 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
     ],
     subtotal: 8000,
     shipping: 0,
-    total: 8000
+    total: 8000,
+    advancePayment: 8000,
+    pendingPayment: 0,
+    paymentHistory: [
+      {
+        id: 'pay-101-1',
+        amount: 8000,
+        date: '2026-08-25 14:30',
+        paymentMethod: 'UPI',
+        note: 'Full Order Payment Received',
+        transactionId: 'TXN-UPI-982172'
+      }
+    ]
   },
   {
     id: 'ord-102',
     orderNumber: 'EG-2026-8922',
+    billNumber: 'BILL-2026-8922',
     createdAt: '2026-08-27 11:15',
     customerName: 'Sneha Patwardhan',
     customerPhone: '+91 99304 56789',
@@ -322,7 +336,7 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
     city: 'Pune',
     pincode: '411045',
     paymentMethod: 'Net Banking',
-    paymentStatus: 'Paid',
+    paymentStatus: 'Partially Paid',
     orderStatus: 'Dispatched',
     items: [
       {
@@ -336,11 +350,24 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
     ],
     subtotal: 12000,
     shipping: 0,
-    total: 12000
+    total: 12000,
+    advancePayment: 4000,
+    pendingPayment: 8000,
+    paymentHistory: [
+      {
+        id: 'pay-102-1',
+        amount: 4000,
+        date: '2026-08-27 11:15',
+        paymentMethod: 'Net Banking',
+        note: 'Advance Murti Booking Deposit',
+        transactionId: 'TXN-NET-443912'
+      }
+    ]
   },
   {
     id: 'ord-103',
     orderNumber: 'EG-2026-8923',
+    billNumber: 'BILL-2026-8923',
     createdAt: '2026-09-01 09:40',
     customerName: 'Kunal Verma',
     customerPhone: '+91 97112 34890',
@@ -349,7 +376,7 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
     city: 'Thane',
     pincode: '400601',
     paymentMethod: 'Cash on Delivery',
-    paymentStatus: 'Cash on Delivery',
+    paymentStatus: 'Pending',
     orderStatus: 'Pending',
     items: [
       {
@@ -363,7 +390,10 @@ export const INITIAL_ORDERS: CustomerOrder[] = [
     ],
     subtotal: 9000,
     shipping: 0,
-    total: 9000
+    total: 9000,
+    advancePayment: 0,
+    pendingPayment: 9000,
+    paymentHistory: []
   }
 ];
 
