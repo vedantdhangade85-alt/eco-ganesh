@@ -4,17 +4,16 @@ import {
   ShieldCheck, 
   CreditCard, 
   Smartphone, 
-  Banknote, 
   Building, 
   CheckCircle2, 
   ArrowRight, 
   Package, 
   Truck, 
-  Sparkles,
-  ChevronLeft,
-  Receipt,
-  Clock,
-  Printer
+  Sparkles, 
+  ChevronLeft, 
+  Receipt, 
+  Clock, 
+  Printer 
 } from 'lucide-react';
 
 interface CheckoutViewProps {
@@ -37,9 +36,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [city, setCity] = useState('');
   const [pincode, setPincode] = useState('');
   
-  // Payment plan: Full payment (100%), Advance booking deposit (30%), or Pay on delivery (0%)
-  const [paymentPlan, setPaymentPlan] = useState<'full' | 'advance' | 'cod'>('advance');
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Cash on Delivery' | 'Net Banking' | 'Credit/Debit Card'>('UPI');
+  // Payment plan: Full payment (100%) or Advance booking deposit (30%)
+  const [paymentPlan, setPaymentPlan] = useState<'full' | 'advance'>('advance');
+  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Net Banking' | 'Credit/Debit Card'>('UPI');
   const [upiId, setUpiId] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,9 +53,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   if (paymentPlan === 'advance') {
     advance = Math.round(total * 0.30); // 30% advance deposit
     pending = total - advance;
-  } else if (paymentPlan === 'cod') {
-    advance = 0;
-    pending = total;
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -74,14 +70,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     const billNumber = `BILL-2026-${randomNum}`;
     const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 
-    let status: CustomerOrder['paymentStatus'] = 'Fully Paid';
-    if (paymentPlan === 'advance') {
-      status = 'Partially Paid';
-    } else if (paymentPlan === 'cod') {
-      status = 'Pending';
-    }
-
-    const effectiveMethod = paymentPlan === 'cod' ? 'Cash on Delivery' : paymentMethod;
+    const status: CustomerOrder['paymentStatus'] = paymentPlan === 'advance' ? 'Partially Paid' : 'Fully Paid';
+    const effectiveMethod = paymentMethod;
 
     const newOrder: CustomerOrder = {
       id: `ord-${Date.now()}`,
@@ -405,13 +395,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               <span>Payment Plan & Method</span>
             </h3>
 
-            {/* Plan Selector: Full vs Advance Deposit vs COD */}
+            {/* Plan Selector: Full vs Advance Deposit */}
             <div className="space-y-2">
               <label className="block text-xs font-bold text-stone-700">
                 Choose Payment Structure:
               </label>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Advance Booking Deposit */}
                 <div
                   onClick={() => setPaymentPlan('advance')}
@@ -457,131 +447,93 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     Zero pending dues. Bill stamped Fully Paid instantly upon checkout.
                   </p>
                 </div>
-
-                {/* Pay on Delivery */}
-                <div
-                  onClick={() => {
-                    setPaymentPlan('cod');
-                    setPaymentMethod('Cash on Delivery');
-                  }}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                    paymentPlan === 'cod'
-                      ? 'border-amber-600 bg-amber-50/60 ring-2 ring-amber-200 shadow-xs'
-                      : 'border-stone-200 hover:border-stone-300 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-stone-900">Pay on Delivery</span>
-                    <span className="text-[10px] font-extrabold bg-stone-100 text-stone-700 px-1.5 py-0.2 rounded">
-                      COD
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-bold text-stone-900">
-                    ₹0 Now (₹{total.toLocaleString('en-IN')} Due)
-                  </p>
-                  <p className="text-[10px] text-stone-500 mt-1">
-                    Pay entire balance via Cash or UPI when your crate is delivered.
-                  </p>
-                </div>
               </div>
             </div>
 
-            {/* Payment Channel (UPI, Net Banking, Card, COD) */}
-            {paymentPlan !== 'cod' ? (
-              <div className="space-y-3 pt-2">
-                <label className="block text-xs font-bold text-stone-700">
-                  Select Payment Method to Pay ₹{advance.toLocaleString('en-IN')}:
+            {/* Payment Channel (UPI, Net Banking, Card) */}
+            <div className="space-y-3 pt-2">
+              <label className="block text-xs font-bold text-stone-700">
+                Select Payment Method to Pay ₹{advance.toLocaleString('en-IN')}:
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* UPI */}
+                <label className={`cursor-pointer p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
+                  paymentMethod === 'UPI'
+                    ? 'border-orange-600 bg-orange-50/50 ring-2 ring-orange-200'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="UPI"
+                    checked={paymentMethod === 'UPI'}
+                    onChange={() => setPaymentMethod('UPI')}
+                    className="h-4 w-4 text-orange-600"
+                  />
+                  <Smartphone className="w-5 h-5 text-emerald-700" />
+                  <div>
+                    <span className="font-bold text-xs text-stone-900 block">UPI / QR</span>
+                    <span className="text-[10px] text-stone-500">GPay, PhonePe, Paytm</span>
+                  </div>
                 </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* UPI */}
-                  <label className={`cursor-pointer p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
-                    paymentMethod === 'UPI'
-                      ? 'border-orange-600 bg-orange-50/50 ring-2 ring-orange-200'
-                      : 'border-stone-200 hover:border-stone-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="UPI"
-                      checked={paymentMethod === 'UPI'}
-                      onChange={() => setPaymentMethod('UPI')}
-                      className="h-4 w-4 text-orange-600"
-                    />
-                    <Smartphone className="w-5 h-5 text-emerald-700" />
-                    <div>
-                      <span className="font-bold text-xs text-stone-900 block">UPI / QR</span>
-                      <span className="text-[10px] text-stone-500">GPay, PhonePe, Paytm</span>
-                    </div>
-                  </label>
-
-                  {/* Net Banking */}
-                  <label className={`cursor-pointer p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
-                    paymentMethod === 'Net Banking'
-                      ? 'border-orange-600 bg-orange-50/50 ring-2 ring-orange-200'
-                      : 'border-stone-200 hover:border-stone-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="Net Banking"
-                      checked={paymentMethod === 'Net Banking'}
-                      onChange={() => setPaymentMethod('Net Banking')}
-                      className="h-4 w-4 text-orange-600"
-                    />
-                    <Building className="w-5 h-5 text-blue-700" />
-                    <div>
-                      <span className="font-bold text-xs text-stone-900 block">Net Banking</span>
-                      <span className="text-[10px] text-stone-500">HDFC, SBI, ICICI</span>
-                    </div>
-                  </label>
-
-                  {/* Card */}
-                  <label className={`cursor-pointer p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
-                    paymentMethod === 'Credit/Debit Card'
-                      ? 'border-orange-600 bg-orange-50/50 ring-2 ring-orange-200'
-                      : 'border-stone-200 hover:border-stone-300'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="Credit/Debit Card"
-                      checked={paymentMethod === 'Credit/Debit Card'}
-                      onChange={() => setPaymentMethod('Credit/Debit Card')}
-                      className="h-4 w-4 text-orange-600"
-                    />
-                    <CreditCard className="w-5 h-5 text-purple-700" />
-                    <div>
-                      <span className="font-bold text-xs text-stone-900 block">Card</span>
-                      <span className="text-[10px] text-stone-500">Visa, Mastercard, RuPay</span>
-                    </div>
-                  </label>
-                </div>
-
-                {paymentMethod === 'UPI' && (
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1.5">
-                    <span className="text-emerald-900 font-bold block">UPI ID or Phone Number</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. yourname@oksbi / 9820012345@upi"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs"
-                    />
+                {/* Net Banking */}
+                <label className={`cursor-pointer p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
+                  paymentMethod === 'Net Banking'
+                    ? 'border-orange-600 bg-orange-50/50 ring-2 ring-orange-200'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="Net Banking"
+                    checked={paymentMethod === 'Net Banking'}
+                    onChange={() => setPaymentMethod('Net Banking')}
+                    className="h-4 w-4 text-orange-600"
+                  />
+                  <Building className="w-5 h-5 text-blue-700" />
+                  <div>
+                    <span className="font-bold text-xs text-stone-900 block">Net Banking</span>
+                    <span className="text-[10px] text-stone-500">HDFC, SBI, ICICI</span>
                   </div>
-                )}
+                </label>
+
+                {/* Card */}
+                <label className={`cursor-pointer p-3.5 rounded-xl border flex items-center gap-3 transition-all ${
+                  paymentMethod === 'Credit/Debit Card'
+                    ? 'border-orange-600 bg-orange-50/50 ring-2 ring-orange-200'
+                    : 'border-stone-200 hover:border-stone-300'
+                }`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="Credit/Debit Card"
+                    checked={paymentMethod === 'Credit/Debit Card'}
+                    onChange={() => setPaymentMethod('Credit/Debit Card')}
+                    className="h-4 w-4 text-orange-600"
+                  />
+                  <CreditCard className="w-5 h-5 text-purple-700" />
+                  <div>
+                    <span className="font-bold text-xs text-stone-900 block">Card</span>
+                    <span className="text-[10px] text-stone-500">Visa, Mastercard, RuPay</span>
+                  </div>
+                </label>
               </div>
-            ) : (
-              <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
-                <p className="font-bold flex items-center gap-1.5">
-                  <Banknote className="w-4 h-4 text-amber-700" />
-                  <span>Pay ₹{total.toLocaleString('en-IN')} on Delivery</span>
-                </p>
-                <p className="text-[11px] text-amber-800">
-                  You can pay via Cash or UPI scan to the delivery artisan upon delivery of your wooden crate.
-                </p>
-              </div>
-            )}
+
+              {paymentMethod === 'UPI' && (
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1.5">
+                  <span className="text-emerald-900 font-bold block">UPI ID or Phone Number</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. yourname@oksbi / 9820012345@upi"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -655,9 +607,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   <span>
                     {paymentPlan === 'advance' 
                       ? `Pay Advance ₹${advance.toLocaleString('en-IN')} & Book`
-                      : paymentPlan === 'full'
-                      ? `Pay ₹${total.toLocaleString('en-IN')} & Confirm`
-                      : `Place Order (Pay on Delivery)`}
+                      : `Pay ₹${total.toLocaleString('en-IN')} & Confirm`}
                   </span>
                   <ArrowRight className="w-4 h-4" />
                 </>

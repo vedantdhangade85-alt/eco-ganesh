@@ -707,7 +707,7 @@ export const AdminPanelView: React.FC<AdminPanelViewProps> = ({
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-900 text-[10px] font-bold rounded-full">
-                              <Clock className="w-3 h-3 text-orange-600" /> Unpaid / COD
+                              <Clock className="w-3 h-3 text-orange-600" /> Unpaid / Pending
                             </span>
                           )}
                           <span className="block text-[10px] text-stone-400 mt-0.5">
